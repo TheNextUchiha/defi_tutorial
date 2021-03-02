@@ -1,3 +1,5 @@
+const { assert } = require('chai');
+
 const DaiToken = artifacts.require('DaiToken');
 const DappToken = artifacts.require('DappToken');
 const TokenFarm = artifacts.require('TokenFarm');
@@ -57,9 +59,54 @@ contract('TokenFarm', ([owner, investor]) => {
         it('reward investors for staking mDai', async () => {
             let result;
 
+            // Check investor balance before staking
             result = await daiToken.balanceOf(investor);
             assert.equal(result.toString(), tokens('100'), 'Investor mDai wallet balance correct before staking');
-        })
+
+            // Stake Mock DAI
+            await daiToken.approve(tokenFarm.address, tokens('100'), { from: investor });
+            await tokenFarm.stakeTokens(tokens('100'), {from: investor});
+
+            // Check Staking status
+            result = await daiToken.balanceOf(investor);
+            assert.equal(result.toString(), tokens('0'), 'investor mDai wallet balance correct after staking');
+
+            result = await daiToken.balanceOf(tokenFarm.address);
+            assert.equal(result.toString(), tokens('100'), 'Token Farm balance correct');
+
+            result = await tokenFarm.stakingBalance(investor);
+            assert.equal(result.toString(), tokens('100'), 'invesotr staking balance correct');
+
+            result = await tokenFarm.isStaking(investor);
+            assert.equal(result.toString(), 'true', 'investor staking balance correct');
+
+
+            // Issue Tokens
+            await tokenFarm.issueTokens({from: owner});
+
+            // Check balance after issuance
+            result = await dappToken.balanceOf(investor);
+            assert.equal(result.toString(), tokens('100'), 'Invesotr Dapp token wallet balance correct after issuance');
+
+            // Ensure that only owner can issue tokens
+            await tokenFarm.issueTokens({from: investor}).should.be.rejected;
+
+            // Unstake tokens
+            await tokenFarm.unstakeTokens({from: investor});
+
+            // Check results after unstaking
+            result = await daiToken.balanceOf(investor);
+            assert.equal(result.toString(), tokens('100'), 'investor mDai wallet balance correct after unstaking');
+
+            result = await daiToken.balanceOf(tokenFarm.address);
+            assert.equal(result.toString(), tokens('0'), 'Token farm mDai wallet balance correct after unstaking');
+
+            result = await tokenFarm.stakingBalance(investor);
+            assert.equal(result.toString(), tokens('0'), 'investor staking balance correct after unstaking');
+
+            result = await tokenFarm.isStaking(investor);
+            assert.equal(result.toString(), 'false', 'investor staking status correct after unstaking');
+        });
     });
 
 });
